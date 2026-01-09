@@ -44,9 +44,10 @@ export default function ViewBookings() {
               <TableHeader>
                 <TableRow>
                   <TableHead>User Email</TableHead>
-                  <TableHead>Bus Number</TableHead>
                   <TableHead>Route</TableHead>
+                  <TableHead>Bus</TableHead>
                   <TableHead>Seat</TableHead>
+                  <TableHead>Position</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -55,9 +56,10 @@ export default function ViewBookings() {
                 {bookings.map((booking) => (
                   <TableRow key={booking.id}>
                     <TableCell className="font-medium">{booking.userEmail}</TableCell>
-                    <TableCell>{booking.busNumber}</TableCell>
-                    <TableCell className="text-muted-foreground">{booking.route}</TableCell>
+                    <TableCell>{booking.route}</TableCell>
+                    <TableCell className="text-muted-foreground">{booking.busNumber}</TableCell>
                     <TableCell>#{booking.seatNumber}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{booking.seatPosition}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(booking.createdAt).toLocaleDateString()}
                     </TableCell>

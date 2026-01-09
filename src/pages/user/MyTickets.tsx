@@ -43,10 +43,10 @@ export default function MyTickets() {
         {!isLoading && bookings.length === 0 ? (
           <EmptyState
             title="No tickets yet"
-            description="You haven't made any bookings. Browse available buses to book a seat."
+            description="You haven't made any bookings. Browse available journeys to book a seat."
             action={{
-              label: 'Browse Buses',
-              onClick: () => navigate('/user/buses'),
+              label: 'Browse Journeys',
+              onClick: () => navigate('/user/journeys'),
             }}
           />
         ) : (

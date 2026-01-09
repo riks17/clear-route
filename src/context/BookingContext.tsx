@@ -1,118 +1,220 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Bus, Booking, Seat } from '@/types';
+import { Bus, BusCapacity, Booking, Seat, Location, Journey } from '@/types';
+
+// Helper to generate realistic bus seat layout
+function generateSeats(capacity: BusCapacity): Seat[] {
+  const seats: Seat[] = [];
+  const seatsPerRow = 4;
+  const totalRows = capacity / seatsPerRow;
+  const positions: Seat['position'][] = ['window-left', 'aisle-left', 'aisle-right', 'window-right'];
+  
+  let seatNumber = 1;
+  for (let row = 1; row <= totalRows; row++) {
+    for (let posIndex = 0; posIndex < 4; posIndex++) {
+      seats.push({
+        id: `seat-${seatNumber}`,
+        seatNumber,
+        isBooked: false,
+        row,
+        position: positions[posIndex],
+      });
+      seatNumber++;
+    }
+  }
+  return seats;
+}
+
+// Helper to get position label
+function getSeatPositionLabel(seat: Seat): string {
+  const side = seat.position.includes('left') ? 'L' : 'R';
+  const type = seat.position.includes('window') ? 'W' : 'A';
+  return `Row ${seat.row}, ${type}${side}`;
+}
 
 interface BookingContextType {
+  // Data
+  locations: Location[];
   buses: Bus[];
+  journeys: Journey[];
   bookings: Booking[];
   isLoading: boolean;
   error: string | null;
-  createBus: (busNumber: string, source: string, destination: string, totalSeats: number) => Promise<boolean>;
-  bookSeat: (busId: string, seatNumber: number, userId: string, userEmail: string) => Promise<boolean>;
-  cancelBooking: (bookingId: string) => Promise<boolean>;
-  resetBus: (busId: string) => Promise<boolean>;
-  getUserBookings: (userId: string) => Booking[];
+  
+  // Location actions
+  addLocation: (name: string) => Promise<boolean>;
+  
+  // Bus actions
+  createBus: (busNumber: string, capacity: BusCapacity) => Promise<boolean>;
   getBusById: (busId: string) => Bus | undefined;
-  getAvailableSeatsCount: (busId: string) => number;
+  
+  // Journey actions
+  createJourney: (busId: string, sourceId: string, destinationId: string) => Promise<boolean>;
+  getJourneyById: (journeyId: string) => Journey | undefined;
+  getAvailableSeatsCount: (journeyId: string) => number;
+  resetJourney: (journeyId: string) => Promise<boolean>;
+  
+  // Auto-fill helpers
+  getJourneyByBus: (busId: string) => Journey | undefined;
+  findBusForRoute: (sourceId: string, destinationId: string) => Bus | undefined;
+  isBusAssignedToJourney: (busId: string) => boolean;
+  
+  // Booking actions
+  bookSeat: (journeyId: string, seatNumber: number, userId: string, userEmail: string) => Promise<boolean>;
+  cancelBooking: (bookingId: string) => Promise<boolean>;
+  getUserBookings: (userId: string) => Booking[];
 }
 
 const BookingContext = createContext<BookingContextType | null>(null);
 
-// Initial mock data
+// Mumbai commuter locations
+const initialLocations: Location[] = [
+  { id: 'loc-1', name: 'Thane' },
+  { id: 'loc-2', name: 'Ghatkopar' },
+  { id: 'loc-3', name: 'Marol Naka' },
+  { id: 'loc-4', name: 'Andheri' },
+  { id: 'loc-5', name: 'Saki Naka' },
+];
+
+// Initial buses (physical assets)
 const initialBuses: Bus[] = [
+  { id: 'bus-1', busNumber: 'MH-04-AB-1234', capacity: 20 },
+  { id: 'bus-2', busNumber: 'MH-04-CD-5678', capacity: 16 },
+  { id: 'bus-3', busNumber: 'MH-04-EF-9012', capacity: 28 },
+];
+
+// Initial journeys (routes users can book)
+const initialJourneys: Journey[] = [
   {
-    id: 'bus-1',
-    busNumber: 'BUS-001',
-    source: 'New York',
-    destination: 'Boston',
+    id: 'journey-1',
+    busId: 'bus-1',
+    busNumber: 'MH-04-AB-1234',
+    sourceId: 'loc-1',
+    sourceName: 'Thane',
+    destinationId: 'loc-2',
+    destinationName: 'Ghatkopar',
     totalSeats: 20,
-    seats: Array.from({ length: 20 }, (_, i) => ({
-      id: `bus-1-seat-${i + 1}`,
-      seatNumber: i + 1,
+    seats: generateSeats(20).map((seat, i) => ({
+      ...seat,
+      id: `journey-1-seat-${seat.seatNumber}`,
       isBooked: i < 3, // First 3 seats pre-booked for demo
-      bookedBy: i < 3 ? 'demo@example.com' : undefined,
+      bookedBy: i < 3 ? 'user@example.com' : undefined,
     })),
   },
   {
-    id: 'bus-2',
-    busNumber: 'BUS-002',
-    source: 'Boston',
-    destination: 'Philadelphia',
+    id: 'journey-2',
+    busId: 'bus-2',
+    busNumber: 'MH-04-CD-5678',
+    sourceId: 'loc-2',
+    sourceName: 'Ghatkopar',
+    destinationId: 'loc-4',
+    destinationName: 'Andheri',
     totalSeats: 16,
-    seats: Array.from({ length: 16 }, (_, i) => ({
-      id: `bus-2-seat-${i + 1}`,
-      seatNumber: i + 1,
-      isBooked: false,
+    seats: generateSeats(16).map(seat => ({
+      ...seat,
+      id: `journey-2-seat-${seat.seatNumber}`,
     })),
   },
   {
-    id: 'bus-3',
-    busNumber: 'BUS-003',
-    source: 'Philadelphia',
-    destination: 'Washington DC',
-    totalSeats: 24,
-    seats: Array.from({ length: 24 }, (_, i) => ({
-      id: `bus-3-seat-${i + 1}`,
-      seatNumber: i + 1,
-      isBooked: i % 5 === 0, // Every 5th seat booked
-      bookedBy: i % 5 === 0 ? 'demo@example.com' : undefined,
+    id: 'journey-3',
+    busId: 'bus-3',
+    busNumber: 'MH-04-EF-9012',
+    sourceId: 'loc-5',
+    sourceName: 'Saki Naka',
+    destinationId: 'loc-3',
+    destinationName: 'Marol Naka',
+    totalSeats: 28,
+    seats: generateSeats(28).map((seat, i) => ({
+      ...seat,
+      id: `journey-3-seat-${seat.seatNumber}`,
+      isBooked: i % 7 === 0, // Every 7th seat booked
+      bookedBy: i % 7 === 0 ? 'demo@example.com' : undefined,
     })),
   },
 ];
 
+// Initial bookings matching pre-booked seats
 const initialBookings: Booking[] = [
   {
     id: 'booking-1',
-    busId: 'bus-1',
-    busNumber: 'BUS-001',
+    journeyId: 'journey-1',
+    busNumber: 'MH-04-AB-1234',
     seatNumber: 1,
-    userId: 'demo@example.com',
-    userEmail: 'demo@example.com',
+    userId: 'user@example.com',
+    userEmail: 'user@example.com',
     status: 'confirmed',
     createdAt: new Date().toISOString(),
-    route: 'New York → Boston',
+    route: 'Thane → Ghatkopar',
+    seatPosition: 'Row 1, WL',
   },
   {
     id: 'booking-2',
-    busId: 'bus-1',
-    busNumber: 'BUS-001',
+    journeyId: 'journey-1',
+    busNumber: 'MH-04-AB-1234',
     seatNumber: 2,
-    userId: 'demo@example.com',
-    userEmail: 'demo@example.com',
+    userId: 'user@example.com',
+    userEmail: 'user@example.com',
     status: 'confirmed',
     createdAt: new Date().toISOString(),
-    route: 'New York → Boston',
+    route: 'Thane → Ghatkopar',
+    seatPosition: 'Row 1, AL',
   },
 ];
 
 export function BookingProvider({ children }: { children: React.ReactNode }) {
+  const [locations, setLocations] = useState<Location[]>(initialLocations);
   const [buses, setBuses] = useState<Bus[]>(initialBuses);
+  const [journeys, setJourneys] = useState<Journey[]>(initialJourneys);
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createBus = useCallback(async (
-    busNumber: string,
-    source: string,
-    destination: string,
-    totalSeats: number
-  ): Promise<boolean> => {
+  // Location actions
+  const addLocation = useCallback(async (name: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const exists = locations.some(l => l.name.toLowerCase() === name.toLowerCase());
+      if (exists) {
+        setError('Location already exists');
+        return false;
+      }
+
+      const newLocation: Location = {
+        id: `loc-${Date.now()}`,
+        name: name.trim(),
+      };
+
+      setLocations(prev => [...prev, newLocation]);
+      return true;
+    } catch {
+      setError('Failed to add location');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [locations]);
+
+  // Bus actions
+  const createBus = useCallback(async (busNumber: string, capacity: BusCapacity): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const exists = buses.some(b => b.busNumber.toLowerCase() === busNumber.toLowerCase());
+      if (exists) {
+        setError('Bus number already exists');
+        return false;
+      }
 
       const newBus: Bus = {
         id: `bus-${Date.now()}`,
-        busNumber,
-        source,
-        destination,
-        totalSeats,
-        seats: Array.from({ length: totalSeats }, (_, i) => ({
-          id: `bus-${Date.now()}-seat-${i + 1}`,
-          seatNumber: i + 1,
-          isBooked: false,
-        })),
+        busNumber: busNumber.trim(),
+        capacity,
       };
 
       setBuses(prev => [...prev, newBus]);
@@ -123,10 +225,128 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
+  }, [buses]);
+
+  const getBusById = useCallback((busId: string): Bus | undefined => {
+    return buses.find(b => b.id === busId);
+  }, [buses]);
+
+  // Journey actions
+  const createJourney = useCallback(async (
+    busId: string,
+    sourceId: string,
+    destinationId: string
+  ): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const bus = buses.find(b => b.id === busId);
+      if (!bus) {
+        setError('Bus not found');
+        return false;
+      }
+
+      const source = locations.find(l => l.id === sourceId);
+      const destination = locations.find(l => l.id === destinationId);
+      if (!source || !destination) {
+        setError('Invalid locations');
+        return false;
+      }
+
+      // Check if bus is already assigned to a journey
+      const existingJourney = journeys.find(j => j.busId === busId);
+      if (existingJourney) {
+        setError('This bus is already assigned to a journey');
+        return false;
+      }
+
+      const newJourney: Journey = {
+        id: `journey-${Date.now()}`,
+        busId,
+        busNumber: bus.busNumber,
+        sourceId,
+        sourceName: source.name,
+        destinationId,
+        destinationName: destination.name,
+        totalSeats: bus.capacity,
+        seats: generateSeats(bus.capacity).map(seat => ({
+          ...seat,
+          id: `journey-${Date.now()}-seat-${seat.seatNumber}`,
+        })),
+      };
+
+      setJourneys(prev => [...prev, newJourney]);
+      return true;
+    } catch {
+      setError('Failed to create journey');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [buses, locations, journeys]);
+
+  const getJourneyById = useCallback((journeyId: string): Journey | undefined => {
+    return journeys.find(j => j.id === journeyId);
+  }, [journeys]);
+
+  const getAvailableSeatsCount = useCallback((journeyId: string): number => {
+    const journey = journeys.find(j => j.id === journeyId);
+    if (!journey) return 0;
+    return journey.seats.filter(s => !s.isBooked).length;
+  }, [journeys]);
+
+  const resetJourney = useCallback(async (journeyId: string): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Reset all seats to available
+      setJourneys(prev => prev.map(journey => {
+        if (journey.id !== journeyId) return journey;
+        return {
+          ...journey,
+          seats: journey.seats.map(s => ({ ...s, isBooked: false, bookedBy: undefined })),
+        };
+      }));
+
+      // Cancel all bookings for this journey
+      setBookings(prev => prev.map(b => {
+        if (b.journeyId !== journeyId) return b;
+        return { ...b, status: 'cancelled' };
+      }));
+
+      return true;
+    } catch {
+      setError('Failed to reset journey');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  // Auto-fill helpers
+  const getJourneyByBus = useCallback((busId: string): Journey | undefined => {
+    return journeys.find(j => j.busId === busId);
+  }, [journeys]);
+
+  const findBusForRoute = useCallback((sourceId: string, destinationId: string): Bus | undefined => {
+    const journey = journeys.find(j => j.sourceId === sourceId && j.destinationId === destinationId);
+    if (!journey) return undefined;
+    return buses.find(b => b.id === journey.busId);
+  }, [journeys, buses]);
+
+  const isBusAssignedToJourney = useCallback((busId: string): boolean => {
+    return journeys.some(j => j.busId === busId);
+  }, [journeys]);
+
+  // Booking actions
   const bookSeat = useCallback(async (
-    busId: string,
+    journeyId: string,
     seatNumber: number,
     userId: string,
     userEmail: string
@@ -135,15 +355,15 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      const bus = buses.find(b => b.id === busId);
-      if (!bus) {
-        setError('Bus not found');
+      const journey = journeys.find(j => j.id === journeyId);
+      if (!journey) {
+        setError('Journey not found');
         return false;
       }
 
-      const seat = bus.seats.find(s => s.seatNumber === seatNumber);
+      const seat = journey.seats.find(s => s.seatNumber === seatNumber);
       if (!seat) {
         setError('Seat not found');
         return false;
@@ -155,11 +375,11 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Update seat
-      setBuses(prev => prev.map(b => {
-        if (b.id !== busId) return b;
+      setJourneys(prev => prev.map(j => {
+        if (j.id !== journeyId) return j;
         return {
-          ...b,
-          seats: b.seats.map(s => {
+          ...j,
+          seats: j.seats.map(s => {
             if (s.seatNumber !== seatNumber) return s;
             return { ...s, isBooked: true, bookedBy: userId };
           }),
@@ -169,14 +389,15 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       // Create booking
       const newBooking: Booking = {
         id: `booking-${Date.now()}`,
-        busId,
-        busNumber: bus.busNumber,
+        journeyId,
+        busNumber: journey.busNumber,
         seatNumber,
         userId,
         userEmail,
         status: 'confirmed',
         createdAt: new Date().toISOString(),
-        route: `${bus.source} → ${bus.destination}`,
+        route: `${journey.sourceName} → ${journey.destinationName}`,
+        seatPosition: getSeatPositionLabel(seat),
       };
 
       setBookings(prev => [...prev, newBooking]);
@@ -187,14 +408,14 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [buses]);
+  }, [journeys]);
 
   const cancelBooking = useCallback(async (bookingId: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const booking = bookings.find(b => b.id === bookingId);
       if (!booking) {
@@ -214,11 +435,11 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
       }));
 
       // Free the seat
-      setBuses(prev => prev.map(bus => {
-        if (bus.id !== booking.busId) return bus;
+      setJourneys(prev => prev.map(journey => {
+        if (journey.id !== booking.journeyId) return journey;
         return {
-          ...bus,
-          seats: bus.seats.map(s => {
+          ...journey,
+          seats: journey.seats.map(s => {
             if (s.seatNumber !== booking.seatNumber) return s;
             return { ...s, isBooked: false, bookedBy: undefined };
           }),
@@ -234,64 +455,31 @@ export function BookingProvider({ children }: { children: React.ReactNode }) {
     }
   }, [bookings]);
 
-  const resetBus = useCallback(async (busId: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Reset all seats to available
-      setBuses(prev => prev.map(bus => {
-        if (bus.id !== busId) return bus;
-        return {
-          ...bus,
-          seats: bus.seats.map(s => ({ ...s, isBooked: false, bookedBy: undefined })),
-        };
-      }));
-
-      // Cancel all bookings for this bus
-      setBookings(prev => prev.map(b => {
-        if (b.busId !== busId) return b;
-        return { ...b, status: 'cancelled' };
-      }));
-
-      return true;
-    } catch {
-      setError('Failed to reset bus');
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   const getUserBookings = useCallback((userId: string): Booking[] => {
     return bookings.filter(b => b.userId === userId);
   }, [bookings]);
 
-  const getBusById = useCallback((busId: string): Bus | undefined => {
-    return buses.find(b => b.id === busId);
-  }, [buses]);
-
-  const getAvailableSeatsCount = useCallback((busId: string): number => {
-    const bus = buses.find(b => b.id === busId);
-    if (!bus) return 0;
-    return bus.seats.filter(s => !s.isBooked).length;
-  }, [buses]);
-
   return (
     <BookingContext.Provider value={{
+      locations,
       buses,
+      journeys,
       bookings,
       isLoading,
       error,
+      addLocation,
       createBus,
+      getBusById,
+      createJourney,
+      getJourneyById,
+      getAvailableSeatsCount,
+      resetJourney,
+      getJourneyByBus,
+      findBusForRoute,
+      isBusAssignedToJourney,
       bookSeat,
       cancelBooking,
-      resetBus,
       getUserBookings,
-      getBusById,
-      getAvailableSeatsCount,
     }}>
       {children}
     </BookingContext.Provider>

@@ -14,16 +14,18 @@ import NotFound from "./pages/NotFound";
 // User pages
 import UserLogin from "./pages/user/UserLogin";
 import UserSignup from "./pages/user/UserSignup";
-import BusList from "./pages/user/BusList";
+import JourneyList from "./pages/user/JourneyList";
 import SeatSelection from "./pages/user/SeatSelection";
 import MyTickets from "./pages/user/MyTickets";
 
 // Admin pages
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import CreateBus from "./pages/admin/CreateBus";
+import ManageLocations from "./pages/admin/ManageLocations";
+import ManageBuses from "./pages/admin/ManageBuses";
+import ManageJourneys from "./pages/admin/ManageJourneys";
+import ManageJourney from "./pages/admin/ManageJourney";
 import ViewBookings from "./pages/admin/ViewBookings";
-import ManageBus from "./pages/admin/ManageBus";
 
 const queryClient = new QueryClient();
 
@@ -47,10 +49,10 @@ const App = () => (
               <Route path="/admin/login" element={<PublicRoute><AdminLogin /></PublicRoute>} />
               
               {/* Protected user routes */}
-              <Route path="/user/buses" element={
-                <ProtectedRoute requiredRole="user"><BusList /></ProtectedRoute>
+              <Route path="/user/journeys" element={
+                <ProtectedRoute requiredRole="user"><JourneyList /></ProtectedRoute>
               } />
-              <Route path="/user/bus/:busId" element={
+              <Route path="/user/journey/:journeyId" element={
                 <ProtectedRoute requiredRole="user"><SeatSelection /></ProtectedRoute>
               } />
               <Route path="/user/tickets" element={
@@ -61,14 +63,20 @@ const App = () => (
               <Route path="/admin/dashboard" element={
                 <ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>
               } />
-              <Route path="/admin/create-bus" element={
-                <ProtectedRoute requiredRole="admin"><CreateBus /></ProtectedRoute>
+              <Route path="/admin/locations" element={
+                <ProtectedRoute requiredRole="admin"><ManageLocations /></ProtectedRoute>
+              } />
+              <Route path="/admin/buses" element={
+                <ProtectedRoute requiredRole="admin"><ManageBuses /></ProtectedRoute>
+              } />
+              <Route path="/admin/journeys" element={
+                <ProtectedRoute requiredRole="admin"><ManageJourneys /></ProtectedRoute>
+              } />
+              <Route path="/admin/journey/:journeyId" element={
+                <ProtectedRoute requiredRole="admin"><ManageJourney /></ProtectedRoute>
               } />
               <Route path="/admin/bookings" element={
                 <ProtectedRoute requiredRole="admin"><ViewBookings /></ProtectedRoute>
-              } />
-              <Route path="/admin/bus/:busId" element={
-                <ProtectedRoute requiredRole="admin"><ManageBus /></ProtectedRoute>
               } />
               
               {/* Catch-all */}
