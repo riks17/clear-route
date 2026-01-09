@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useBooking } from '@/context/BookingContext';
-import { SeatGrid } from '@/components/SeatGrid';
+import { BusSeatLayout } from '@/components/BusSeatLayout';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SuccessMessage } from '@/components/SuccessMessage';
 import { ErrorState, LoadingState } from '@/components/StateIndicators';
@@ -12,24 +12,24 @@ import { ArrowLeft, MapPin } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
 
 export default function SeatSelection() {
-  const { busId } = useParams<{ busId: string }>();
+  const { journeyId } = useParams<{ journeyId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getBusById, bookSeat, isLoading, error } = useBooking();
+  const { getJourneyById, bookSeat, isLoading, error } = useBooking();
   
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookedSeatNumber, setBookedSeatNumber] = useState<number | null>(null);
 
-  const bus = busId ? getBusById(busId) : undefined;
+  const journey = journeyId ? getJourneyById(journeyId) : undefined;
 
-  if (!bus) {
+  if (!journey) {
     return (
       <UserLayout>
         <ErrorState 
-          message="Bus not found. It may have been removed from the system."
-          onRetry={() => navigate('/user/buses')}
+          message="Journey not found. It may have been removed from the system."
+          onRetry={() => navigate('/user/journeys')}
         />
       </UserLayout>
     );
@@ -48,7 +48,7 @@ export default function SeatSelection() {
   const handleConfirmBooking = async () => {
     if (!selectedSeat || !user) return;
 
-    const success = await bookSeat(bus.id, selectedSeat, user.id, user.email);
+    const success = await bookSeat(journey.id, selectedSeat, user.id, user.email);
     
     if (success) {
       setBookedSeatNumber(selectedSeat);
@@ -59,12 +59,17 @@ export default function SeatSelection() {
     setShowConfirm(false);
   };
 
+  const selectedSeatObj = journey.seats.find(s => s.seatNumber === selectedSeat);
+  const seatPositionText = selectedSeatObj 
+    ? `Row ${selectedSeatObj.row}, ${selectedSeatObj.position.includes('window') ? 'Window' : 'Aisle'} (${selectedSeatObj.position.includes('left') ? 'Left' : 'Right'})`
+    : '';
+
   if (bookingSuccess) {
     return (
       <UserLayout>
         <SuccessMessage
           title="Booking Confirmed!"
-          message={`Your seat #${bookedSeatNumber} on ${bus.busNumber} (${bus.source} → ${bus.destination}) has been booked successfully.`}
+          message={`Your Seat #${bookedSeatNumber} on the journey from ${journey.sourceName} to ${journey.destinationName} has been booked successfully.`}
           action={{
             label: 'View My Tickets',
             onClick: () => navigate('/user/tickets'),
@@ -78,22 +83,22 @@ export default function SeatSelection() {
     <UserLayout>
       <div className="space-y-6 max-w-2xl mx-auto">
         <Link 
-          to="/user/buses" 
+          to="/user/journeys" 
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to buses
+          Back to journeys
         </Link>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>{bus.busNumber}</span>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              {journey.sourceName} → {journey.destinationName}
             </CardTitle>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>{bus.source} → {bus.destination}</span>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Bus: {journey.busNumber} • {journey.totalSeats} seats
+            </p>
           </CardHeader>
           <CardContent className="space-y-6">
             {isLoading ? (
@@ -106,18 +111,23 @@ export default function SeatSelection() {
                   </div>
                 )}
 
-                <SeatGrid
-                  seats={bus.seats}
+                <BusSeatLayout
+                  seats={journey.seats}
                   selectedSeat={selectedSeat}
                   onSeatSelect={handleSeatSelect}
-                  columns={4}
                 />
 
                 {selectedSeat && (
                   <div className="pt-4 border-t space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Selected Seat:</span>
-                      <span className="font-semibold">Seat #{selectedSeat}</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Selected Seat:</span>
+                        <span className="font-semibold">Seat #{selectedSeat}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Position:</span>
+                        <span>{seatPositionText}</span>
+                      </div>
                     </div>
                     <Button onClick={handleBookClick} className="w-full" size="lg">
                       Book Seat #{selectedSeat}
@@ -139,7 +149,7 @@ export default function SeatSelection() {
           open={showConfirm}
           onOpenChange={setShowConfirm}
           title="Confirm Booking"
-          description={`Are you sure you want to book Seat #${selectedSeat} on ${bus.busNumber} (${bus.source} → ${bus.destination})?`}
+          description={`Book Seat #${selectedSeat} (${seatPositionText}) on the journey ${journey.sourceName} → ${journey.destinationName}?`}
           confirmLabel="Confirm Booking"
           onConfirm={handleConfirmBooking}
         />

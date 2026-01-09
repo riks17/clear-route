@@ -2,29 +2,38 @@ import { Link } from 'react-router-dom';
 import { useBooking } from '@/context/BookingContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Bus, Ticket } from 'lucide-react';
+import { Plus, FileText, Bus, MapPin, Navigation, Ticket } from 'lucide-react';
 import AdminLayout from '@/layouts/AdminLayout';
 
 export default function AdminDashboard() {
-  const { buses, bookings } = useBooking();
+  const { locations, buses, journeys, bookings } = useBooking();
   
   const confirmedBookings = bookings.filter(b => b.status === 'confirmed').length;
-  const totalSeats = buses.reduce((acc, bus) => acc + bus.totalSeats, 0);
-  const bookedSeats = buses.reduce((acc, bus) => acc + bus.seats.filter(s => s.isBooked).length, 0);
+  const totalSeats = journeys.reduce((acc, journey) => acc + journey.totalSeats, 0);
+  const bookedSeats = journeys.reduce((acc, journey) => acc + journey.seats.filter(s => s.isBooked).length, 0);
 
   return (
     <AdminLayout>
       <div className="space-y-8">
         <div>
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Manage buses and view bookings</p>
+          <p className="text-muted-foreground">Manage locations, buses, and journeys</p>
         </div>
 
         {/* Quick Stats */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Buses</CardDescription>
+              <CardDescription>Locations</CardDescription>
+              <CardTitle className="text-3xl flex items-center gap-2">
+                <MapPin className="h-6 w-6 text-primary" />
+                {locations.length}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Buses</CardDescription>
               <CardTitle className="text-3xl flex items-center gap-2">
                 <Bus className="h-6 w-6 text-primary" />
                 {buses.length}
@@ -33,92 +42,107 @@ export default function AdminDashboard() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Active Bookings</CardDescription>
+              <CardDescription>Active Journeys</CardDescription>
               <CardTitle className="text-3xl flex items-center gap-2">
-                <Ticket className="h-6 w-6 text-success" />
-                {confirmedBookings}
+                <Navigation className="h-6 w-6 text-success" />
+                {journeys.length}
               </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Seats</CardDescription>
-              <CardTitle className="text-3xl">{totalSeats}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Seats Booked</CardDescription>
-              <CardTitle className="text-3xl">{bookedSeats}</CardTitle>
+              <CardTitle className="text-3xl flex items-center gap-2">
+                <Ticket className="h-6 w-6 text-success" />
+                {bookedSeats}/{totalSeats}
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid sm:grid-cols-2 gap-4">
+        {/* Three Main Sections */}
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* Locations Section */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Create New Bus
+                <MapPin className="h-5 w-5" />
+                Locations
               </CardTitle>
               <CardDescription>
-                Add a new bus to the system with seat configuration
+                Manage pickup and drop points
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {locations.length} locations configured
+              </div>
               <Button asChild className="w-full">
-                <Link to="/admin/create-bus">Create Bus</Link>
+                <Link to="/admin/locations">Manage Locations</Link>
               </Button>
             </CardContent>
           </Card>
 
+          {/* Buses Section */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                View All Bookings
+                <Bus className="h-5 w-5" />
+                Buses
               </CardTitle>
               <CardDescription>
-                See all ticket sales and booking statuses
+                Physical bus assets
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/admin/bookings">View Bookings</Link>
+            <CardContent className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {buses.length} buses registered
+              </div>
+              <Button asChild className="w-full">
+                <Link to="/admin/buses">Manage Buses</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Journeys Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Navigation className="h-5 w-5" />
+                Journeys
+              </CardTitle>
+              <CardDescription>
+                Routes users can book
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                {journeys.length} active journeys
+              </div>
+              <Button asChild className="w-full">
+                <Link to="/admin/journeys">Manage Journeys</Link>
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Bus List with Reset Option */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Manage Buses</h2>
-          {buses.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No buses created yet.</p>
-          ) : (
-            <div className="grid gap-2">
-              {buses.map((bus) => {
-                const bookedCount = bus.seats.filter(s => s.isBooked).length;
-                return (
-                  <Card key={bus.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{bus.busNumber}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {bus.source} → {bus.destination} • {bookedCount}/{bus.totalSeats} seats booked
-                        </p>
-                      </div>
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={`/admin/bus/${bus.id}`}>Manage</Link>
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {/* View Bookings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              All Bookings
+            </CardTitle>
+            <CardDescription>
+              {confirmedBookings} active bookings across all journeys
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/admin/bookings">View All Bookings</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </AdminLayout>
   );

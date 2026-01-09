@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Plus, FileText, LogOut } from 'lucide-react';
+import { Shield, MapPin, Bus, Navigation, FileText, LogOut } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -30,26 +30,40 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <Badge className="admin-indicator text-xs">ADMIN</Badge>
             </Link>
             
-            <nav className="flex items-center gap-4">
+            <nav className="hidden md:flex items-center gap-4">
               <Link 
-                to="/admin/create-bus" 
+                to="/admin/locations" 
                 className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5"
               >
-                <Plus className="h-4 w-4" />
-                Create Bus
+                <MapPin className="h-4 w-4" />
+                Locations
+              </Link>
+              <Link 
+                to="/admin/buses" 
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+              >
+                <Bus className="h-4 w-4" />
+                Buses
+              </Link>
+              <Link 
+                to="/admin/journeys" 
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+              >
+                <Navigation className="h-4 w-4" />
+                Journeys
               </Link>
               <Link 
                 to="/admin/bookings" 
                 className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5"
               >
                 <FileText className="h-4 w-4" />
-                View Bookings
+                Bookings
               </Link>
             </nav>
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-1.5" />
               Logout
